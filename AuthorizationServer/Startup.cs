@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using AspNet.Security.OpenIdConnect.Extensions;
 using AuthorizationServer.Data;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -42,6 +45,25 @@ namespace AuthorizationServer
 
             services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie()
+                .AddGitHub(options =>
+                {
+                    options.ClientId = Configuration["GitHub:ClientId"];
+                    options.ClientSecret = Configuration["GitHub:ClientSecret"];
+
+                    options.Scope.Add("user:email");
+
+                    options.Events = new OAuthEvents
+                    {
+                        OnCreatingTicket = context =>
+                        {
+                            // Add claim for avatar
+                            string avatar = context.User.Value<string>("avatar_url");
+                            context.Identity.AddClaim(new Claim("github:avatar", avatar, ClaimValueTypes.String, context.Options.ClaimsIssuer));
+
+                            return Task.CompletedTask;
+                        }
+                    };
+                })
                 .AddOAuthValidation();
 
             services.AddOpenIddict(options =>
